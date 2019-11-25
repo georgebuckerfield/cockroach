@@ -326,6 +326,9 @@ func setupTransientCluster(
 			joinAddr = c.s.ServingRPCAddr()
 		}
 		args := testServerArgsForTransientCluster(roachpb.NodeID(i+1), joinAddr)
+		if i == 0 && len(demoCtx.externalIODir) > 0 {
+			args.ExternalIODir = demoCtx.externalIODir
+		}
 
 		// readyCh is used if latency simulation is requested to notify that a test server has
 		// successfully computed its RPC address.
