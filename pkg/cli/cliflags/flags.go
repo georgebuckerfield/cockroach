@@ -931,9 +931,25 @@ to us-east1 and availability zone to 3.
 When used with the Movr dataset, create a 9 node cluster and automatically apply
 the geo-partitioned replicas topology across 3 virtual regions named us-east1, us-west1, and
 europe-west1. This command will fail with an error if an enterprise license could not
-be acquired, or if the Movr dataset is not used. More information about the geo-partitioned 
-replicas topology can be found at this URL: 
+be acquired, or if the Movr dataset is not used. More information about the geo-partitioned
+replicas topology can be found at this URL:
 https://www.cockroachlabs.com/docs/v19.1/topology-geo-partitioned-replicas.html
+		`,
+	}
+	DemoExternalIODirs = FlagInfo{
+		Name: "node-externaliodirs",
+		Description: `
+A comma separated list of external directories for demo nodes to use as nodelocal storage. The directories
+will be mapped in order to nodes. For example:
+
+--node-externaliodirs=/tmp/node1,/tmp/node2
+
+This would assign the following directory to each node:
+
+node 1 = /tmp/node1
+node 2 = /tmp/node2
+
+The number of directories specified must match the number of nodes.
 		`,
 	}
 

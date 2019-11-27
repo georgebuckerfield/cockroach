@@ -596,6 +596,7 @@ func init() {
 	IntFlag(demoFlags, &demoCtx.nodes, cliflags.DemoNodes, 1)
 	BoolFlag(demoFlags, &demoCtx.runWorkload, cliflags.RunDemoWorkload, false)
 	VarFlag(demoFlags, &demoCtx.localities, cliflags.DemoNodeLocality)
+	StringSlice(demoFlags, &demoCtx.externalIODirs, cliflags.DemoExternalIODirs, demoCtx.externalIODirs)
 	BoolFlag(demoFlags, &demoCtx.geoPartitionedReplicas, cliflags.DemoGeoPartitionedReplicas, false)
 	// Mark the --global flag as hidden until we investigate it more.
 	BoolFlag(demoFlags, &demoCtx.simulateLatency, cliflags.Global, false)

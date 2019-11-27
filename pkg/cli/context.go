@@ -158,7 +158,7 @@ func initCLIDefaults() {
 	demoCtx.disableTelemetry = false
 	demoCtx.disableLicenseAcquisition = false
 	demoCtx.transientCluster = nil
-	demoCtx.externalIODir = ""
+	demoCtx.externalIODirs = []string{}
 
 	initPreFlagsDefaults()
 
@@ -364,5 +364,5 @@ var demoCtx struct {
 	geoPartitionedReplicas    bool
 	simulateLatency           bool
 	transientCluster          *transientCluster
-	externalIODir             string
+	externalIODirs            []string
 }

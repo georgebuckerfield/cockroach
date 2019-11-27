@@ -247,6 +247,15 @@ func (c *transientCluster) RestartNode(nodeID roachpb.NodeID) error {
 	return nil
 }
 
+func getExternalIODir(int nodeID) string {
+	if len(demoCtx.externalIODirs) > 0 {
+		if nodeID <= len(demoCtx.externalIODirs) {
+			return demoCtx.externalIODirs[nodeID-1], nil
+		}
+	}
+	return "", nil
+}
+
 // testServerArgsForTransientCluster creates the test arguments for
 // a necessary server in the demo cluster.
 func testServerArgsForTransientCluster(nodeID roachpb.NodeID, joinAddr string) base.TestServerArgs {
@@ -257,6 +266,8 @@ func testServerArgsForTransientCluster(nodeID roachpb.NodeID, joinAddr string) b
 			fmt.Sprintf("%s/demo-node%d", startCtx.backtraceOutputDir, nodeID),
 		),
 	}
+
+	if args.ExternalIODir = getExternalIODir(nodeID)
 
 	if demoCtx.localities != nil {
 		args.Locality = demoCtx.localities[int(nodeID-1)]
@@ -288,6 +299,12 @@ func setupTransientCluster(
 		for i := 0; i < demoCtx.nodes; i++ {
 			demoCtx.localities[i] = defaultLocalities[i%len(defaultLocalities)]
 		}
+	}
+
+	if len(demoCtx.externalIODirs) != 0 {
+		 if len(demoCtx.externalIODirs) != demoCtx.nodes {
+			 return c, errors.Errorf("number of external directories specified must equal number of nodes")
+		 }
 	}
 
 	// Set up logging. For demo/transient server we use non-standard
@@ -326,9 +343,6 @@ func setupTransientCluster(
 			joinAddr = c.s.ServingRPCAddr()
 		}
 		args := testServerArgsForTransientCluster(roachpb.NodeID(i+1), joinAddr)
-		if i == 0 && len(demoCtx.externalIODir) > 0 {
-			args.ExternalIODir = demoCtx.externalIODir
-		}
 
 		// readyCh is used if latency simulation is requested to notify that a test server has
 		// successfully computed its RPC address.
