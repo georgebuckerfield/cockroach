@@ -247,13 +247,13 @@ func (c *transientCluster) RestartNode(nodeID roachpb.NodeID) error {
 	return nil
 }
 
-func getExternalIODir(int nodeID) string {
+func getExternalIODir(nodeID int) string {
 	if len(demoCtx.externalIODirs) > 0 {
 		if nodeID <= len(demoCtx.externalIODirs) {
-			return demoCtx.externalIODirs[nodeID-1], nil
+			return demoCtx.externalIODirs[nodeID-1]
 		}
 	}
-	return "", nil
+	return ""
 }
 
 // testServerArgsForTransientCluster creates the test arguments for
@@ -267,7 +267,9 @@ func testServerArgsForTransientCluster(nodeID roachpb.NodeID, joinAddr string) b
 		),
 	}
 
-	if args.ExternalIODir = getExternalIODir(nodeID)
+	if len(demoCtx.externalIODirs) > 0 {
+		args.ExternalIODir = getExternalIODir(int(nodeID))
+	}
 
 	if demoCtx.localities != nil {
 		args.Locality = demoCtx.localities[int(nodeID-1)]
