@@ -10,6 +10,7 @@ package changefeedccl
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"fmt"
 	"io"
@@ -49,7 +50,8 @@ func cloudStorageFormatTime(ts hlc.Timestamp) string {
 
 type cloudStorageSinkFile struct {
 	cloudStorageSinkKey
-	buf bytes.Buffer
+	buf        bytes.Buffer
+	compressor io.WriteCloser
 }
 
 // cloudStorageSink writes changefeed output to files in a cloud storage bucket
@@ -273,6 +275,7 @@ type cloudStorageSink struct {
 	dataFileTs        string
 	dataFilePartition string
 	prevFilename      string
+	fileCompression   compressionType
 }
 
 var cloudStorageSinkIDAtomic int64
@@ -306,7 +309,6 @@ func makeCloudStorageSink(
 		s.dataFileTs = cloudStorageFormatTime(timestampOracle.inclusiveLowerBoundTS())
 		s.dataFilePartition = timestampOracle.inclusiveLowerBoundTS().GoTime().Format(s.partitionFormat)
 	}
-
 	switch formatType(opts[optFormat]) {
 	case optFormatJSON:
 		// TODO(dan): It seems like these should be on the encoder, but that
@@ -320,7 +322,12 @@ func makeCloudStorageSink(
 		return nil, errors.Errorf(`this sink is incompatible with %s=%s`,
 			optFormat, opts[optFormat])
 	}
-
+	switch compressionType(opts[fileCompression]) {
+	case optGzipCompression:
+		s.fileCompression = optGzipCompression
+		s.ext = s.ext + ".gz"
+	default:
+	}
 	switch envelopeType(opts[optEnvelope]) {
 	case optEnvelopeWrapped:
 	default:
@@ -351,6 +358,9 @@ func (s *cloudStorageSink) getOrCreateFile(
 	f := &cloudStorageSinkFile{
 		cloudStorageSinkKey: key,
 	}
+	if s.fileCompression == optGzipCompression {
+		f.compressor = gzip.NewWriter(f.buf)
+	}
 	s.files.ReplaceOrInsert(f)
 	return f
 }
@@ -366,11 +376,20 @@ func (s *cloudStorageSink) EmitRow(
 	file := s.getOrCreateFile(table.Name, table.Version)
 
 	// TODO(dan): Memory monitoring for this
-	if _, err := file.buf.Write(value); err != nil {
-		return err
-	}
-	if err := s.recordDelimFn(&file.buf); err != nil {
-		return err
+	if f.compressor {
+		if _, err := f.compressor.Write(value); err != nil {
+			return err
+		}
+		if err := s.recordDelimFn(&file.compressor); err != nil {
+			return err
+		}
+	} else {
+		if _, err := f.buf.Write(value); err != nil {
+			return err
+		}
+		if err := s.recordDelimFn(&file.buf); err != nil {
+			return err
+		}
 	}
 
 	if int64(file.buf.Len()) > s.targetMaxFileSize {
@@ -470,6 +489,13 @@ func (s *cloudStorageSink) flushFile(ctx context.Context, file *cloudStorageSink
 		// This method shouldn't be called with an empty file, but be defensive
 		// about not writing empty files anyway.
 		return nil
+	}
+
+	if file.compressor {
+		err = file.compressor.Close(&file.buf)
+		if err != nil {
+			return errors.Errorf("failed to close gzip writer")
+		}
 	}
 
 	// We use this monotonically increasing fileID to ensure correct ordering

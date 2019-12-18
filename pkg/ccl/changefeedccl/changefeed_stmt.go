@@ -46,6 +46,7 @@ func init() {
 	)
 }
 
+type compressionType string
 type envelopeType string
 type formatType string
 
@@ -66,6 +67,8 @@ const (
 
 	optFormatJSON formatType = `json`
 	optFormatAvro formatType = `experimental_avro`
+
+	optGzipCompression compressionType = `gzip`
 
 	sinkParamCACert           = `ca_cert`
 	sinkParamClientCert       = `client_cert`
