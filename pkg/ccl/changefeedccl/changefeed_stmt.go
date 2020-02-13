@@ -46,6 +46,7 @@ func init() {
 	)
 }
 
+type compressionType string
 type envelopeType string
 type formatType string
 
@@ -58,6 +59,7 @@ const (
 	optResolvedTimestamps      = `resolved`
 	optUpdatedTimestamps       = `updated`
 	optDiff                    = `diff`
+	optCompression             = `compression`
 
 	optEnvelopeKeyOnly       envelopeType = `key_only`
 	optEnvelopeRow           envelopeType = `row`
@@ -66,6 +68,8 @@ const (
 
 	optFormatJSON formatType = `json`
 	optFormatAvro formatType = `experimental_avro`
+
+	optCompressionGzip compressionType = `gzip`
 
 	sinkParamCACert           = `ca_cert`
 	sinkParamClientCert       = `client_cert`
@@ -92,6 +96,7 @@ var changefeedOptionExpectValues = map[string]sql.KVStringOptValidate{
 	optResolvedTimestamps:      sql.KVStringOptAny,
 	optUpdatedTimestamps:       sql.KVStringOptRequireNoValue,
 	optDiff:                    sql.KVStringOptRequireNoValue,
+	optCompression:             sql.KVStringOptAny,
 }
 
 // changefeedPlanHook implements sql.PlanHookFn.
