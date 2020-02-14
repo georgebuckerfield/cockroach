@@ -9,6 +9,7 @@
 package changefeedccl
 
 import (
+	"compress/gzip"
 	"context"
 	"fmt"
 	"io/ioutil"
@@ -60,6 +61,35 @@ func TestCloudStorageSink(t *testing.T) {
 		require.NoError(t, filepath.Walk(absRoot, walkFn))
 		return files
 	}
+	slurpGzip := func(t *testing.T, root string) []string {
+		var files []string
+		walkFn := func(path string, info os.FileInfo, err error) error {
+			if err != nil {
+				return err
+			}
+			if info.IsDir() {
+				return nil
+			}
+			file, err := ioutil.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			zr, err := gzip.NewReader(bytes.NewBuffer(file))
+			if err != nil {
+				return nil, err
+			}
+			s, err := ioutil.ReadAll(zr)
+			if err != nil {
+				return nil, err
+			}
+			files = append(files, string(s))
+			return nil
+		}
+		absRoot := filepath.Join(dir, root)
+		require.NoError(t, os.MkdirAll(absRoot, 0755))
+		require.NoError(t, filepath.Walk(absRoot, walkFn))
+		return files
+	}
 
 	const unlimitedFileSize = math.MaxInt64
 	var noKey []byte
@@ -78,6 +108,37 @@ func TestCloudStorageSink(t *testing.T) {
 	externalStorageFromURI := func(ctx context.Context, uri string) (cloud.ExternalStorage, error) {
 		return cloud.ExternalStorageFromURI(ctx, uri, settings, clientFactory)
 	}
+
+	t.Run(`gzip`, func(t *testing.T) {
+		t1 := &sqlbase.TableDescriptor{Name: `t1`}
+		testSpan := roachpb.Span{Key: []byte("a"), EndKey: []byte("b")}
+		sf := span.MakeFrontier(testSpan)
+		timestampOracle := &changeAggregatorLowerBoundOracle{sf: sf}
+		dir := `single-node`
+		opts[optCompression] = string(optCompressionGzip)
+		s, err := makeCloudStorageSink(
+			`nodelocal:///`+dir, 1, unlimitedFileSize,
+			settings, opts, timestampOracle, externalStorageFromURI,
+		)
+		require.NoError(t, err)
+		s.(*cloudStorageSink).sinkID = 7 // Force a deterministic sinkID.
+
+		// Empty flush emits no files.
+		require.NoError(t, s.Flush(ctx))
+		require.Equal(t, []string(nil), slurpDir(t, dir))
+
+		// Emit a row and flush to file
+		require.NoError(t, s.EmitRow(ctx, t1, noKey, []byte(`v1`), ts(1)))
+		require.NoError(t, s.Flush(ctx))
+		expected := []string{
+			"v1\nv2\n",
+			"w1\n",
+		}
+		actual := slurpGzip(t, dir)
+		sort.Strings(actual)
+		require.Equal(t, expected, actual)
+
+	})
 
 	t.Run(`golden`, func(t *testing.T) {
 		t1 := &sqlbase.TableDescriptor{Name: `t1`}
