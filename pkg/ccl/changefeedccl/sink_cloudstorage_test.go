@@ -9,6 +9,7 @@
 package changefeedccl
 
 import (
+	"bytes"
 	"compress/gzip"
 	"context"
 	"fmt"
@@ -108,37 +109,6 @@ func TestCloudStorageSink(t *testing.T) {
 	externalStorageFromURI := func(ctx context.Context, uri string) (cloud.ExternalStorage, error) {
 		return cloud.ExternalStorageFromURI(ctx, uri, settings, clientFactory)
 	}
-
-	t.Run(`gzip`, func(t *testing.T) {
-		t1 := &sqlbase.TableDescriptor{Name: `t1`}
-		testSpan := roachpb.Span{Key: []byte("a"), EndKey: []byte("b")}
-		sf := span.MakeFrontier(testSpan)
-		timestampOracle := &changeAggregatorLowerBoundOracle{sf: sf}
-		dir := `single-node`
-		opts[optCompression] = string(optCompressionGzip)
-		s, err := makeCloudStorageSink(
-			`nodelocal:///`+dir, 1, unlimitedFileSize,
-			settings, opts, timestampOracle, externalStorageFromURI,
-		)
-		require.NoError(t, err)
-		s.(*cloudStorageSink).sinkID = 7 // Force a deterministic sinkID.
-
-		// Empty flush emits no files.
-		require.NoError(t, s.Flush(ctx))
-		require.Equal(t, []string(nil), slurpDir(t, dir))
-
-		// Emit a row and flush to file
-		require.NoError(t, s.EmitRow(ctx, t1, noKey, []byte(`v1`), ts(1)))
-		require.NoError(t, s.Flush(ctx))
-		expected := []string{
-			"v1\nv2\n",
-			"w1\n",
-		}
-		actual := slurpGzip(t, dir)
-		sort.Strings(actual)
-		require.Equal(t, expected, actual)
-
-	})
 
 	t.Run(`golden`, func(t *testing.T) {
 		t1 := &sqlbase.TableDescriptor{Name: `t1`}
@@ -554,5 +524,35 @@ func TestCloudStorageSink(t *testing.T) {
 			"x1\n",
 			"w1\n",
 		}, slurpDir(t, dir))
+	})
+	t.Run(`gzip`, func(t *testing.T) {
+		t1 := &sqlbase.TableDescriptor{Name: `t1`}
+		testSpan := roachpb.Span{Key: []byte("a"), EndKey: []byte("b")}
+		sf := span.MakeFrontier(testSpan)
+		timestampOracle := &changeAggregatorLowerBoundOracle{sf: sf}
+		dir := `gzip`
+		opts[optCompression] = string(optCompressionGzip)
+		s, err := makeCloudStorageSink(
+			`nodelocal:///`+dir, 1, unlimitedFileSize,
+			settings, opts, timestampOracle, externalStorageFromURI,
+		)
+		require.NoError(t, err)
+		s.(*cloudStorageSink).sinkID = 7 // Force a deterministic sinkID.
+
+		// Empty flush emits no files.
+		require.NoError(t, s.Flush(ctx))
+		require.Equal(t, []string(nil), slurpDir(t, dir))
+
+		// Emit a row and flush to file
+		require.NoError(t, s.EmitRow(ctx, t1, noKey, []byte(`v1`), ts(1)))
+		require.NoError(t, s.Flush(ctx))
+		expected := []string{
+			"v1\n",
+		}
+		actual := slurpGzip(t, dir)
+		sort.Strings(actual)
+		require.Equal(t, expected, actual)
+		// Remove compression option for other tests
+		delete(opts, optCompression)
 	})
 }
