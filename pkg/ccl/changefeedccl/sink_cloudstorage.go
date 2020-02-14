@@ -322,7 +322,7 @@ func makeCloudStorageSink(
 		return nil, errors.Errorf(`this sink is incompatible with %s=%s`,
 			optFormat, opts[optFormat])
 	}
-	switch compressionType(opts[fileCompression]) {
+	switch compressionType(opts[optCompression]) {
 	case optCompressionGzip:
 		s.fileCompression = optCompressionGzip
 		s.ext = s.ext + ".gz"
@@ -380,7 +380,7 @@ func (s *cloudStorageSink) EmitRow(
 		if _, err := file.compressor.Write(value); err != nil {
 			return err
 		}
-		if err := s.recordDelimFn(&file.compressor); err != nil {
+		if err := s.recordDelimFn(file.compressor); err != nil {
 			return err
 		}
 	} else {
