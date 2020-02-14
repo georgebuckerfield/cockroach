@@ -77,11 +77,11 @@ func TestCloudStorageSink(t *testing.T) {
 			}
 			zr, err := gzip.NewReader(bytes.NewBuffer(file))
 			if err != nil {
-				return nil, err
+				return err
 			}
 			s, err := ioutil.ReadAll(zr)
 			if err != nil {
-				return nil, err
+				return err
 			}
 			files = append(files, string(s))
 			return nil
